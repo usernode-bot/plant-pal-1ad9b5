@@ -112,83 +112,81 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // fresh load.
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
-// Plants: the signed-in viewer's watering list. Rows are per-user — every
-// query filters on `user_id`, so no viewer sees or changes another's plants.
-const PLANT_COLUMNS = 'id, name, watering_interval_days, last_watered_at, created_at';
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-const plantFromRow = (row) => ({
-  id: row.id,
-  name: row.name,
-  wateringIntervalDays: row.watering_interval_days,
-  lastWateredAt: row.last_watered_at,
-  createdAt: row.created_at,
-});
+// The due-watering rule lives here, in one place, so the client only
+// renders what this returns:
+// - never watered, or at/past the interval → due today;
+// - watered less than one day ago → watered recently;
+// - otherwise → upcoming, due in N days (N at least 1).
+function withStatus(plant) {
+  if (!plant.last_watered_at) return { ...plant, status: 'due-today' };
+  const days = Math.floor((Date.now() - new Date(plant.last_watered_at).getTime()) / DAY_MS);
+  if (days >= plant.water_every_days) return { ...plant, status: 'due-today' };
+  if (days < 1) return { ...plant, status: 'watered-recently' };
+  return { ...plant, status: 'upcoming', due_in_days: plant.water_every_days - days };
+}
 
-// Read-only demo state for staging previews (`?demo=1`): four obviously fake
-// plants in all four watering states, so the populated screen can be seen in
-// a preview without a real plant row. Never persisted, never in production.
-const DAY_MS = 86_400_000;
-const demoPlants = () => {
-  const now = Date.now();
-  const daysAgo = (days) => new Date(now - days * DAY_MS).toISOString();
-  return [
-    { id: 900001, name: 'Staging demo fern', wateringIntervalDays: 7, lastWateredAt: null, createdAt: daysAgo(30) },
-    { id: 900002, name: 'Staging demo monstera', wateringIntervalDays: 7, lastWateredAt: daysAgo(9), createdAt: daysAgo(29) },
-    { id: 900003, name: 'Staging demo pothos', wateringIntervalDays: 7, lastWateredAt: daysAgo(4), createdAt: daysAgo(28) },
-    { id: 900004, name: 'Staging demo basil', wateringIntervalDays: 7, lastWateredAt: daysAgo(0), createdAt: daysAgo(27) },
-  ];
-};
-
+// Plant list
 app.get('/api/plants', async (req, res) => {
-  if (IS_STAGING && req.query.demo === '1') {
-    return res.json({ plants: demoPlants() });
-  }
   try {
+    if (IS_STAGING && req.query.demo === '1') {
+      const now = Date.now();
+      return res.json({ plants: [
+        // 9 days since a 7-day interval → due today; 10 hours ago →
+        // recently; never watered → due today.
+        { id: -1, name: 'Staging demo Fern', water_every_days: 7, last_watered_at: new Date(now - 9 * DAY_MS).toISOString() },
+        { id: -2, name: 'Staging demo Pothos', water_every_days: 7, last_watered_at: new Date(now - 10 * 60 * 60 * 1000).toISOString() },
+        { id: -3, name: 'Staging demo Basil', water_every_days: 7, last_watered_at: null },
+      ].map(withStatus) });
+    }
     const { rows } = await pool.query(`
-      SELECT ${PLANT_COLUMNS} FROM plants WHERE user_id = $1 ORDER BY created_at, id
+      SELECT id, name, water_every_days, last_watered_at
+      FROM plants
+      WHERE user_id = $1
+      ORDER BY name
     `, [req.user.id]);
-    res.json({ plants: rows.map(plantFromRow) });
+    res.json({ plants: rows.map(withStatus) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Add a plant
 app.post('/api/plants', async (req, res) => {
-  const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-  if (!name || name.length > 255) {
-    return res.status(400).json({ error: 'Give the plant a name of up to 255 characters.' });
-  }
-  let interval = req.body.wateringIntervalDays;
-  if (interval === undefined || interval === null || interval === '') interval = 7;
-  interval = Number(interval);
+  const name = req.body && typeof req.body.name === 'string' ? req.body.name.trim() : '';
+  const interval = req.body && req.body.water_every_days !== undefined
+    ? req.body.water_every_days
+    : 7;
+  if (!name) return res.status(400).json({ error: 'Give the plant a name' });
   if (!Number.isInteger(interval) || interval < 1 || interval > 365) {
-    return res.status(400).json({ error: 'Watering interval must be a whole number of days between 1 and 365.' });
+    return res.status(400).json({ error: 'Watering interval must be a whole number of days between 1 and 365' });
   }
   try {
     const { rows } = await pool.query(`
-      INSERT INTO plants (user_id, name, watering_interval_days)
+      INSERT INTO plants (user_id, name, water_every_days)
       VALUES ($1, $2, $3)
-      RETURNING ${PLANT_COLUMNS}
+      RETURNING id, name, water_every_days, last_watered_at
     `, [req.user.id, name, interval]);
-    res.status(201).json({ plant: plantFromRow(rows[0]) });
+    res.json({ plant: withStatus(rows[0]) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Mark watered
 app.post('/api/plants/:id/water', async (req, res) => {
-  const id = Number(req.params.id);
+  const id = Number.parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) return res.status(404).json({ error: 'Plant not found' });
   try {
-    // The user_id predicate means one viewer cannot water another's plant;
-    // 404 rather than 403 so it does not reveal that the plant exists.
-    const { rows } = await pool.query(`
+    const result = await pool.query(`
       UPDATE plants SET last_watered_at = NOW()
       WHERE id = $1 AND user_id = $2
-      RETURNING ${PLANT_COLUMNS}
     `, [id, req.user.id]);
-    if (!rows.length) return res.status(404).json({ error: 'Plant not found' });
-    res.json({ plant: plantFromRow(rows[0]) });
+    // Not owned or not found get the same answer, so a stranger cannot
+    // learn which ids exist.
+    if (!result.rowCount) return res.status(404).json({ error: 'Plant not found' });
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -231,40 +229,16 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Fake owner for the staging demo rows: negative, so it can never collide
-// with a real user id from a platform-issued token.
-const STAGING_DEMO_USER_ID = -1;
-
 async function start() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS plants (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL,
       name VARCHAR(255) NOT NULL,
-      watering_interval_days INTEGER NOT NULL DEFAULT 7,
-      last_watered_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      water_every_days INTEGER NOT NULL,
+      last_watered_at TIMESTAMPTZ
     )
   `);
-  if (IS_STAGING) {
-    // Obviously fake demo plants owned by a fake identity, spread across all
-    // four watering states (never watered, overdue, due soon, just watered).
-    // Idempotent: skipped once the demo owner has any row.
-    const existing = await pool.query(
-      'SELECT 1 FROM plants WHERE user_id = $1 LIMIT 1',
-      [STAGING_DEMO_USER_ID],
-    );
-    if (existing.rowCount === 0) {
-      await pool.query(`
-        INSERT INTO plants (user_id, name, watering_interval_days, last_watered_at)
-        VALUES
-          ($1, 'Staging demo fern', 7, NULL),
-          ($1, 'Staging demo monstera', 7, NOW() - INTERVAL '9 days'),
-          ($1, 'Staging demo pothos', 7, NOW() - INTERVAL '4 days'),
-          ($1, 'Staging demo basil', 7, NOW())
-      `, [STAGING_DEMO_USER_ID]);
-    }
-  }
   const server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;

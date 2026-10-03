@@ -64,7 +64,7 @@
   })();
   </script>
   <title>Plant Pal</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 6C27 34 14 54 14 70a36 36 0 0 0 72 0C86 54 73 34 50 6Z' fill='%2315803d'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 8C68 31 86 51 86 68a36 36 0 0 1-72 0C14 51 32 31 50 8Z' fill='%2315803d'/></svg>">
   <!-- Tailwind, PRECOMPILED for this app (was cdn.tailwindcss.com's
        in-browser engine plus an inline tailwind.config here). The config
        moved to tailwind.config.js in the repo root; npm run build compiles
@@ -108,259 +108,231 @@
   </script>
 </head>
 <body class="min-h-screen bg-ground text-fg">
+  <!-- Built from the design kit in styles/tailwind-input.css: colour tokens
+       (bg-ground, text-muted, bg-accent, ...) that are right in both looks,
+       and components (btn-primary, list, card, state-empty, ...). CLAUDE.md's
+       "## Design" says how. -->
   <main class="mx-auto flex max-w-md flex-col gap-8 px-4 py-10">
-
-    <header class="px-1">
-      <h1 class="text-title">Plant Pal</h1>
-      <p id="today-count" class="text-small text-muted"></p>
-    </header>
+    <h1 class="text-title">Plant Pal</h1>
 
     <!-- Anything that loads data shows exactly one of these at a time:
-         loading, the data (the two lists below), empty or error. -->
+         loading, the data, empty (it loaded, and there is nothing yet)
+         or error (it did not load). The script below switches them. -->
     <div id="plants-loading" role="status">
       <span class="sr-only">Loading your plants</span>
       <div class="list">
-        <div class="list-row"><div class="skeleton h-4 w-2/5"></div></div>
         <div class="list-row"><div class="skeleton h-4 w-1/2"></div></div>
         <div class="list-row"><div class="skeleton h-4 w-1/3"></div></div>
+        <div class="list-row"><div class="skeleton h-4 w-2/5"></div></div>
       </div>
     </div>
-
     <div id="plants-error" class="state-error" hidden>
       <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
       <p class="text-heading">Couldn't load your plants</p>
-      <p class="text-body text-muted">Your plants are saved and untouched — the list just failed to load.</p>
+      <p class="text-body text-muted">Nothing was lost. Your plants and watering history are safe. Try again.</p>
       <button id="plants-retry" class="btn-secondary">Retry</button>
     </div>
-
     <div id="plants-empty" class="state-empty" hidden>
       <p class="text-heading">No plants yet</p>
-      <p class="text-body text-muted">Add your first plant to start tracking when it needs water.</p>
-      <button id="empty-add" class="btn-secondary">Add a plant</button>
+      <p class="text-body text-muted">Add your first plant below to start its watering schedule.</p>
+      <button id="plants-empty-add" class="btn-secondary">Add plant</button>
     </div>
 
-    <section id="today-section" hidden>
-      <h2 class="section-label">Needs water today</h2>
-      <ul id="today-list" class="list"></ul>
-      <p id="water-error" class="mt-2 px-1 text-small text-danger" hidden></p>
-    </section>
+    <div id="plants-view" hidden>
+      <section id="today-section" hidden>
+        <h2 class="section-label">Needs water today</h2>
+        <ul id="today-list" class="list"></ul>
+      </section>
+      <section id="all-section" class="mt-6" hidden>
+        <h2 class="section-label">All plants</h2>
+        <ul id="all-list" class="list"></ul>
+      </section>
+    </div>
 
-    <section id="all-section" hidden>
-      <h2 class="section-label">All plants</h2>
-      <ul id="all-list" class="list"></ul>
-    </section>
-
-    <section class="card">
-      <h2 class="section-label">Add plant</h2>
-      <form id="add-form" class="flex flex-col gap-3">
-        <div>
-          <label for="plant-name" class="mb-1 block text-small font-medium">Plant name</label>
-          <input id="plant-name" class="field" type="text" maxlength="255" required autocomplete="off" placeholder="e.g. Monstera">
-        </div>
-        <div>
-          <label for="plant-interval" class="mb-1 block text-small font-medium">Watering interval</label>
-          <input id="plant-interval" class="field" type="number" min="1" max="365" step="1" value="7" inputmode="numeric">
-          <p class="mt-1 text-small text-muted">Days between waterings</p>
-        </div>
-        <button type="submit" id="add-btn" class="btn-primary">Add plant</button>
-        <p id="add-error" class="text-small text-danger" hidden></p>
-      </form>
-    </section>
-
+    <form id="add-form" class="card flex flex-col gap-4" novalidate>
+      <h2 class="text-heading">Add plant</h2>
+      <div class="flex flex-col gap-1">
+        <label for="add-name" class="text-small text-muted">Plant name</label>
+        <input id="add-name" class="field" type="text" maxlength="255" autocomplete="off" placeholder="e.g. Fern">
+      </div>
+      <div class="flex flex-col gap-1">
+        <label for="add-interval" class="text-small text-muted">Watering interval (in days)</label>
+        <input id="add-interval" class="field" type="number" min="1" max="365" step="1" inputmode="numeric" value="7">
+      </div>
+      <p id="add-error" class="text-small text-danger" hidden></p>
+      <button id="add-submit" type="submit" class="btn-secondary">Add plant</button>
+    </form>
   </main>
 
   <script>
-    (function () {
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get('token') || '';
-      // Forward the staging demo flag to the API (read-only fake plants;
-      // see server.js). It only ever matters in staging.
-      const apiQuery = params.get('demo') === '1' ? '?demo=1' : '';
-      const apiHeaders = token ? { 'x-usernode-token': token } : {};
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token') || '';
+    const headers = token ? { 'x-usernode-token': token } : {};
+    // Staging previews pass ?demo=1 for obviously fake plants; pass it
+    // through so the populated screen can be reviewed.
+    const demoQuery = params.get('demo') === '1' ? '?demo=1' : '';
 
-      const el = {
-        count: document.getElementById('today-count'),
-        loading: document.getElementById('plants-loading'),
-        error: document.getElementById('plants-error'),
-        empty: document.getElementById('plants-empty'),
-        todaySection: document.getElementById('today-section'),
-        todayList: document.getElementById('today-list'),
-        allSection: document.getElementById('all-section'),
-        allList: document.getElementById('all-list'),
-        waterError: document.getElementById('water-error'),
-        retry: document.getElementById('plants-retry'),
-        emptyAdd: document.getElementById('empty-add'),
-        addForm: document.getElementById('add-form'),
-        addName: document.getElementById('plant-name'),
-        addInterval: document.getElementById('plant-interval'),
-        addBtn: document.getElementById('add-btn'),
-        addError: document.getElementById('add-error'),
-      };
+    // The plant list's states, one shown at a time. Empty only when the
+    // load worked and found nothing; a failure is the error state, never
+    // "No plants yet".
+    const views = {
+      loading: document.getElementById('plants-loading'),
+      view: document.getElementById('plants-view'),
+      empty: document.getElementById('plants-empty'),
+      error: document.getElementById('plants-error'),
+    };
+    function show(name) {
+      for (const [key, el] of Object.entries(views)) el.hidden = key !== name;
+    }
 
-      const DAY_MS = 24 * 60 * 60 * 1000;
-      let plants = [];
+    // The signature element: a small drop beside each plant. Static markup
+    // only — plant names go in as text below, never as HTML.
+    const DROP_ICONS = {
+      filled: '<svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5 shrink-0 text-accent" aria-hidden="true"><path d="M10 2.3c2.6 3.2 5.5 6.6 5.5 9.7a5.5 5.5 0 1 1-11 0C4.5 8.9 7.4 5.5 10 2.3Z"/></svg>',
+      outline: '<svg viewBox="0 0 20 20" class="h-5 w-5 shrink-0 text-muted" aria-hidden="true"><path d="M10 2.3c2.6 3.2 5.5 6.6 5.5 9.7a5.5 5.5 0 1 1-11 0C4.5 8.9 7.4 5.5 10 2.3Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+      checked: '<svg viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5 shrink-0 text-accent" aria-hidden="true"><path d="M10 2.3c2.6 3.2 5.5 6.6 5.5 9.7a5.5 5.5 0 1 1-11 0C4.5 8.9 7.4 5.5 10 2.3Z"/><path class="text-on-accent" d="m7.3 12.3 1.9 1.9 3.5-3.9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    };
 
-      function daysSince(iso, now) {
-        return Math.floor((now - new Date(iso).getTime()) / DAY_MS);
+    // Words and colours for each server-computed status.
+    function statusOf(plant) {
+      if (plant.status === 'due-today') return { icon: 'filled', label: 'Due today' };
+      if (plant.status === 'watered-recently') return { icon: 'checked', label: 'Watered recently' };
+      const n = plant.due_in_days;
+      return { icon: 'outline', label: 'Due in ' + n + (n === 1 ? ' day' : ' days') };
+    }
+
+    function lastWateredText(plant) {
+      if (!plant.last_watered_at) return 'Never watered';
+      const days = Math.floor((Date.now() - new Date(plant.last_watered_at).getTime()) / 86400000);
+      return days < 1 ? 'Watered today' : 'Last watered ' + days + (days === 1 ? ' day ago' : ' days ago');
+    }
+
+    function dropEl(icon) {
+      const span = document.createElement('span');
+      span.innerHTML = DROP_ICONS[icon];
+      return span;
+    }
+
+    function todayRow(plant) {
+      const li = document.createElement('li');
+      li.className = 'list-row items-start';
+      const text = document.createElement('div');
+      const name = document.createElement('p');
+      name.className = 'text-body font-medium';
+      name.textContent = plant.name;
+      const since = document.createElement('p');
+      since.className = 'text-small text-muted';
+      since.textContent = lastWateredText(plant);
+      text.append(name, since);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn-primary';
+      button.textContent = 'Mark watered';
+      button.addEventListener('click', () => waterPlant(plant, button));
+      li.append(dropEl('filled'), text, button);
+      return li;
+    }
+
+    function allRow(plant) {
+      const li = document.createElement('li');
+      li.className = 'list-row justify-between';
+      const name = document.createElement('span');
+      name.className = 'text-body font-medium';
+      name.textContent = plant.name;
+      const state = statusOf(plant);
+      const status = document.createElement('span');
+      status.className = 'text-small text-muted';
+      status.textContent = state.label;
+      li.append(dropEl(state.icon), name, status);
+      return li;
+    }
+
+    function render(plants) {
+      if (!plants.length) { show('empty'); return; }
+      const due = plants.filter(p => p.status === 'due-today');
+      const rest = plants.filter(p => p.status !== 'due-today');
+      document.getElementById('today-section').hidden = !due.length;
+      document.getElementById('today-list').replaceChildren(...due.map(todayRow));
+      document.getElementById('all-section').hidden = !rest.length;
+      document.getElementById('all-list').replaceChildren(...rest.map(allRow));
+      show('view');
+    }
+
+    async function loadPlants() {
+      show('loading');
+      let plants;
+      try {
+        const res = await fetch('/api/plants' + demoQuery, { headers });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        ({ plants } = await res.json());
+      } catch {
+        show('error');
+        return;
       }
+      render(plants);
+    }
 
-      // One place computes a plant's watering state, from the viewer's local
-      // clock: watered less than 24 hours ago is "Watered recently", never
-      // watered or at/past the interval is due today.
-      function status(plant, now) {
-        if (!plant.lastWateredAt) return { due: true, label: 'Due today' };
-        const days = daysSince(plant.lastWateredAt, now);
-        if (days <= 0) return { due: false, label: 'Watered recently' };
-        if (days >= plant.wateringIntervalDays) return { due: true, label: 'Due today' };
-        return { due: false, label: 'Due in ' + (plant.wateringIntervalDays - days) + ' days' };
-      }
-
-      function lastWateredLine(plant, now) {
-        if (!plant.lastWateredAt) return 'Never watered';
-        const days = Math.max(0, daysSince(plant.lastWateredAt, now));
-        if (days === 0) return 'Watered today';
-        if (days === 1) return 'Watered yesterday';
-        return 'Last watered ' + days + ' days ago';
-      }
-
-      // The water drop, this app's signature: accent-coloured when the plant
-      // is due, muted when it is not. Both class strings are whole literals,
-      // so the precompiled stylesheet carries both looks.
-      function dropSvg(due) {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', '0 0 20 20');
-        svg.setAttribute('fill', 'currentColor');
-        svg.setAttribute('aria-hidden', 'true');
-        svg.setAttribute('class', due
-          ? 'mt-0.5 h-5 w-5 shrink-0 text-accent'
-          : 'mt-0.5 h-5 w-5 shrink-0 text-muted');
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', 'M10 1.5c-3.3 3.9-5.75 7.1-5.75 10.3a5.75 5.75 0 0 0 11.5 0C15.75 8.6 13.3 5.4 10 1.5Z');
-        svg.appendChild(path);
-        return svg;
-      }
-
-      function nameBlock(plant, subLine) {
-        const wrap = document.createElement('div');
-        wrap.className = 'min-w-0 flex-1';
-        const name = document.createElement('p');
-        name.className = 'truncate text-body font-medium';
-        name.textContent = plant.name;
-        const sub = document.createElement('p');
-        sub.className = 'text-small text-muted';
-        sub.textContent = subLine;
-        wrap.append(name, sub);
-        return wrap;
-      }
-
-      function todayRow(plant, now) {
-        const li = document.createElement('li');
-        li.className = 'list-row';
-        const button = document.createElement('button');
-        button.className = 'btn-primary shrink-0 px-3 text-small';
-        button.textContent = 'Mark watered';
-        button.addEventListener('click', async () => {
-          button.disabled = true;
-          el.waterError.hidden = true;
-          try {
-            const res = await fetch('/api/plants/' + plant.id + '/water', {
-              method: 'POST',
-              headers: apiHeaders,
-            });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            await loadPlants();
-          } catch {
-            button.disabled = false;
-            el.waterError.textContent = 'Could not mark ' + plant.name + ' watered. Your plants are unchanged — try again.';
-            el.waterError.hidden = false;
-          }
+    async function waterPlant(plant, button) {
+      button.disabled = true;
+      try {
+        const res = await fetch('/api/plants/' + plant.id + '/water', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
         });
-        li.append(dropSvg(true), nameBlock(plant, lastWateredLine(plant, now)), button);
-        return li;
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        // The list reloads without a page refresh: the plant moves out of
+        // the today group as watered recently.
+        loadPlants();
+      } catch {
+        button.disabled = false;
       }
+    }
 
-      function allRow(plant, now) {
-        const li = document.createElement('li');
-        li.className = 'list-row';
-        const s = status(plant, now);
-        li.append(dropSvg(s.due), nameBlock(plant, s.label));
-        return li;
+    const addForm = document.getElementById('add-form');
+    const addName = document.getElementById('add-name');
+    const addInterval = document.getElementById('add-interval');
+    const addError = document.getElementById('add-error');
+    const addSubmit = document.getElementById('add-submit');
+
+    function showAddError(message) {
+      addError.textContent = message;
+      addError.hidden = false;
+    }
+
+    addForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      addError.hidden = true;
+      const name = addName.value.trim();
+      const interval = addInterval.value === '' ? undefined : Number(addInterval.value);
+      if (!name) return showAddError('Give the plant a name first.');
+      if (interval !== undefined && (!Number.isInteger(interval) || interval < 1 || interval > 365)) {
+        return showAddError('Watering interval must be a whole number of days between 1 and 365.');
       }
-
-      function render() {
-        const now = Date.now();
-        el.todayList.replaceChildren(...plants.filter(p => status(p, now).due).map(p => todayRow(p, now)));
-        el.allList.replaceChildren(...plants.map(p => allRow(p, now)));
-        const dueCount = el.todayList.children.length;
-        el.count.textContent =
-          plants.length === 0 ? '' :
-          dueCount === 0 ? 'All watered today' :
-          dueCount === 1 ? '1 plant needs water today' :
-          dueCount + ' plants need water today';
-        setPane(plants.length ? 'data' : 'empty');
+      addSubmit.disabled = true;
+      try {
+        const res = await fetch('/api/plants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ name, water_every_days: interval }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Could not add the plant');
+        addName.value = '';
+        addInterval.value = '7';
+        loadPlants();
+      } catch (err) {
+        showAddError(err.message);
+      } finally {
+        addSubmit.disabled = false;
       }
+    });
 
-      // Exactly one pane (loading, data, empty, error) visible at a time;
-      // within the data pane the "today" section disappears when the group
-      // is empty rather than showing an empty list.
-      function setPane(name) {
-        el.loading.hidden = name !== 'loading';
-        el.error.hidden = name !== 'error';
-        el.empty.hidden = name !== 'empty';
-        const data = name === 'data';
-        el.todaySection.hidden = !data || el.todayList.children.length === 0;
-        el.allSection.hidden = !data;
-      }
+    document.getElementById('plants-retry').addEventListener('click', loadPlants);
+    document.getElementById('plants-empty-add').addEventListener('click', () => {
+      addName.focus();
+    });
 
-      async function loadPlants(opts = {}) {
-        if (opts.showLoading) setPane('loading');
-        let data;
-        try {
-          const res = await fetch('/api/plants' + apiQuery, { headers: apiHeaders });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          data = await res.json();
-        } catch {
-          setPane('error');
-          return;
-        }
-        plants = Array.isArray(data.plants) ? data.plants : [];
-        render();
-      }
-
-      el.retry.addEventListener('click', () => loadPlants({ showLoading: true }));
-
-      el.emptyAdd.addEventListener('click', () => {
-        el.addForm.scrollIntoView({ block: 'center' });
-        el.addName.focus();
-      });
-
-      el.addForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        el.addError.hidden = true;
-        const name = el.addName.value.trim();
-        if (!name) return;
-        const interval = el.addInterval.value === '' ? 7 : Number(el.addInterval.value);
-        el.addBtn.disabled = true;
-        try {
-          const res = await fetch('/api/plants', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...apiHeaders },
-            body: JSON.stringify({ name, wateringIntervalDays: interval }),
-          });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          el.addName.value = '';
-          el.addInterval.value = '7';
-          await loadPlants();
-        } catch {
-          el.addError.textContent = 'Could not add the plant. Nothing was saved — try again.';
-          el.addError.hidden = false;
-        } finally {
-          el.addBtn.disabled = false;
-        }
-      });
-
-      loadPlants({ showLoading: true });
-    })();
+    loadPlants();
   </script>
 </body>
 </html>

@@ -60,17 +60,30 @@ the platform fixes the base commit, and none of this applies.
 
 ## Starter template (replaced)
 
-The starter template screen (the Press! demo, `/api/press`, `/api/leaderboard`
-and the `presses` table) was replaced by the app's first real screen. The
-platform infrastructure that must survive any future rewrite of
-`public/index.html` is still there: the `usernode-dev-console@1` forwarder
-`<script>`, the `/tailwind.css` link, the bridge `<script>`, and the theme
-`<script>` right after the bridge tag, which sets a `dark` class on `<html>`
-from the viewer's Homeroom theme. Give everything you build both looks (the
-design kit's colour tokens carry both); unless a request asks for one, add
-no theme picker — the viewer's Homeroom setting is the control. "The
-platform's light/dark theme inside the app frame" in the platform
-conventions has the details.
+The starter template's screen — the starter notice, the "What's already
+working" card and the Press! example (its demo markup, its `/api/press`
+and `/api/leaderboard` routes, and the `presses` table bootstrap) — was
+removed when the app's first real feature was built. Do not build it back.
+
+What stays from the template, through any rewrite, because it is
+platform infrastructure rather than template content:
+
+- the `usernode-dev-console@1` forwarder `<script>`,
+- the bridge `<script>`,
+- the theme `<script>` right after the bridge tag, which sets a `dark`
+  class on `<html>`, and
+- the precompiled `/tailwind.css` link.
+
+The design kit is not placeholder either: build the real app with it, and
+keep "## Design" below current.
+
+The screen keeps a light and a dark look that follow the viewer's Homeroom
+theme, switching live when they change it. Give everything you build both
+looks (the design kit's colour tokens carry both), unless one fixed look is
+the point of this app, like a game's own scene; then say so under "## Design"
+below. Unless a request asks for one, add no theme picker: the viewer's
+Homeroom setting is the control. "The platform's light/dark theme inside the
+app frame" in the platform conventions has the details.
 
 If a rule below this line conflicts with the hosted conventions, the
 hosted conventions win. This file is **app-specific** — write down
@@ -82,30 +95,32 @@ tables you've marked private), etc.
 
 ## About Plant Pal
 
-Track watering schedules for your houseplants. The user keeps a list of
-their plants with a per-plant watering interval in days, sees when each was
-last watered, and waters the ones that are due today from a single screen.
-The one primary action is **Mark watered**. First version: add, list and
-water — no editing, deleting, reminders or photos yet.
+Track watering schedules for your houseplants. Each plant gets a name and
+its own watering interval in days, and the screen answers "which plants do
+I water today?" at a glance: a "Needs water today" group on top, with a
+"Mark watered" button per plant, and an "All plants" list below. Marking a
+plant watered restarts its schedule from now. This version keeps it small:
+no photos, no species database, no care reminders or notifications, and
+plants can only be added and watered (no rename, edit or delete).
 
 ## Design
 
-This app's look. Every later change follows it, and updates it when a
-request changes the look on purpose.
-
-- **Palette:** basil green accent on the warm stone neutrals the starter
-  kit ships (ground, surface, raised, fg, muted, line untouched). Light
-  accent `21 128 61` (deep basil, white text on it), dark accent
-  `134 239 172` (bright leaf) with dark text `20 83 45`. No second colour;
-  danger untouched.
-- **Signature element:** the water-drop glyph on every plant row — drawn in
-  the accent when the plant is due, muted when it is not, so the state
-  reads before the words do.
+- **Palette:** accent basil green — light look: deep basil `21 128 61`
+  with white `--on-accent`; dark look: brighter leaf green `74 222 128`
+  with a dark green `--on-accent`. Red stays reserved for errors. The
+  neutrals are the warm stone greys the template shipped (ground,
+  surface, raised, line, muted).
+- **Signature element:** a per-plant water-drop status — a small drop
+  icon beside each plant that reads **Due today** (drop filled, accent
+  colour), **Due in N days** (drop outlined, muted) or **Watered
+  recently** (drop with a check). No other screen element carries the
+  drop shape.
 - **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`
-  (unchanged sizes in `tailwind.config.js`).
-- The screen is a normal app screen, not a scene: it renders in both the
-  light and the dark look from the same tokens; no fixed theme, no theme
-  picker.
+  _(change their sizes in `tailwind.config.js` if you must, not their number)_
+- **Words the screen uses:** "Plant Pal", "Needs water today", "All
+  plants", "Mark watered", "Due today", "Due in N days", "Watered
+  recently", "Add plant", "Plant name", "Watering interval", "No plants
+  yet". Reuse them for the same things rather than introducing synonyms.
 
 The kit is in `styles/tailwind-input.css`: colour tokens with a light and
 a dark value (named in `tailwind.config.js`), and a few components
@@ -121,19 +136,13 @@ Re-theme by changing the token values there, keeping every text pair at
 - Every screen that loads data has honest loading, empty and error states.
   Never show the empty state while loading or after a failure; an error says
   what failed, what still works, and offers Retry.
-- Seed obviously fake staging demo data so the populated screen can be seen
-  ("Staging mock data" in the platform conventions).
 - No cards in cards, no uppercase eyebrows, no emoji as icons.
 
 ## App-specific conventions
 
-- Plant rows are strictly per-user: every query on `plants` filters on
-  `user_id = req.user.id`; one viewer can never read or water another's
-  plant (a foreign id answers 404, not 403).
-- Watering state is computed client-side from `lastWateredAt` and
-  `wateringIntervalDays` against the viewer's local day; the server stores
-  only the timestamp.
-- The `plants` table stays public (no `staging:private` comment): it holds
-  plant names and watering dates, nothing sensitive beyond that.
-- Staging demo rows are owned by fake identity `user_id = -1`; previews
-  see a populated screen via `/?demo=1` (read-only injection, staging only).
+- Watering due-ness is computed server-side, in `withStatus` in
+  `server.js`, so the rule lives in one place; the client only renders
+  what it returns.
+- Staging demo plants are request-time injection on `GET /api/plants?demo=1`
+  (behind `IS_STAGING`), never written rows.
+- Avoid adding new npm dependencies.
