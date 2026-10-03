@@ -203,8 +203,13 @@
 
     function lastWateredText(plant) {
       if (!plant.last_watered_at) return 'Never watered';
-      const days = Math.floor((Date.now() - new Date(plant.last_watered_at).getTime()) / 86400000);
-      return days < 1 ? 'Watered today' : 'Last watered ' + days + (days === 1 ? ' day ago' : ' days ago');
+      const watered = new Date(plant.last_watered_at);
+      const now = new Date();
+      const sameDay = watered.getFullYear() === now.getFullYear()
+        && watered.getMonth() === now.getMonth()
+        && watered.getDate() === now.getDate();
+      if (sameDay) return 'Watered today';
+      return 'Watered ' + watered.toLocaleDateString(undefined, { weekday: 'short' });
     }
 
     function dropEl(icon) {
@@ -229,21 +234,25 @@
       button.className = 'btn-primary';
       button.textContent = 'Mark watered';
       button.addEventListener('click', () => waterPlant(plant, button));
-      li.append(dropEl('filled'), text, button);
+      li.append(dropEl('filled'), text, button, deleteButton(plant));
       return li;
     }
 
     function allRow(plant) {
       const li = document.createElement('li');
-      li.className = 'list-row justify-between';
-      const name = document.createElement('span');
+      li.className = 'list-row items-start';
+      const text = document.createElement('div');
+      const name = document.createElement('p');
       name.className = 'text-body font-medium';
       name.textContent = plant.name;
       const state = statusOf(plant);
-      const status = document.createElement('span');
-      status.className = 'text-small text-muted';
-      status.textContent = state.label;
-      li.append(dropEl(state.icon), name, status);
+      const line = document.createElement('p');
+      line.className = 'text-small text-muted';
+      // Never-watered plants keep the status label alone; a watered one
+      // gains the weekday, e.g. "Due in 5 days · Watered Tue".
+      line.textContent = state.label + (plant.last_watered_at ? ' · ' + lastWateredText(plant) : '');
+      text.append(name, line);
+      li.append(dropEl(state.icon), text, deleteButton(plant));
       return li;
     }
 
@@ -286,6 +295,46 @@
       } catch {
         button.disabled = false;
       }
+    }
+
+    // Delete cannot be undone, so the first tap only arms the button; the
+    // second, within three seconds, deletes. Disarm back to plain "Delete"
+    // if the person taps nothing or the request fails.
+    function disarmDelete(button) {
+      delete button.dataset.armed;
+      button.textContent = 'Delete';
+      button.classList.remove('text-danger');
+    }
+
+    async function deletePlant(plant, button) {
+      button.disabled = true;
+      try {
+        const res = await fetch('/api/plants/' + plant.id, { method: 'DELETE', headers });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        // The list reloads without a page refresh: the row disappears.
+        loadPlants();
+      } catch {
+        button.disabled = false;
+        disarmDelete(button);
+      }
+    }
+
+    function deleteButton(plant) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn-secondary';
+      button.textContent = 'Delete';
+      button.addEventListener('click', () => {
+        if (button.dataset.armed) {
+          deletePlant(plant, button);
+          return;
+        }
+        button.dataset.armed = '1';
+        button.textContent = 'Confirm delete';
+        button.classList.add('text-danger');
+        setTimeout(() => disarmDelete(button), 3000);
+      });
+      return button;
     }
 
     const addForm = document.getElementById('add-form');

@@ -195,6 +195,24 @@ app.post('/api/plants/:id/water', async (req, res) => {
   }
 });
 
+// Delete a plant
+app.delete('/api/plants/:id', async (req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(404).json({ error: 'Plant not found' });
+  try {
+    const result = await pool.query(`
+      DELETE FROM plants
+      WHERE id = $1 AND user_id = $2
+    `, [id, req.user.id]);
+    // Not owned or not found get the same answer, so a stranger cannot
+    // learn which ids exist.
+    if (!result.rowCount) return res.status(404).json({ error: 'Plant not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // HTML shell: serve the app if authenticated. Unauthenticated top-level

@@ -101,7 +101,7 @@ I water today?" at a glance: a "Needs water today" group on top, with a
 "Mark watered" button per plant, and an "All plants" list below. Marking a
 plant watered restarts its schedule from now. This version keeps it small:
 no photos, no species database, no care reminders or notifications, and
-plants can only be added and watered (no rename, edit or delete).
+plants can only be added, watered and deleted (no rename or edit).
 
 ## Design
 
@@ -119,7 +119,8 @@ plants can only be added and watered (no rename, edit or delete).
   _(change their sizes in `tailwind.config.js` if you must, not their number)_
 - **Words the screen uses:** "Plant Pal", "Needs water today", "All
   plants", "Mark watered", "Due today", "Due in N days", "Watered
-  recently", "Add plant", "Plant name", "Watering interval", "No plants
+  recently", "Watered today", "Watered Tue", "Delete", "Confirm delete",
+  "Add plant", "Plant name", "Watering interval", "No plants
   yet". Reuse them for the same things rather than introducing synonyms.
 
 The kit is in `styles/tailwind-input.css`: colour tokens with a light and
