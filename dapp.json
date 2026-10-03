@@ -9,6 +9,18 @@
       "expectText": "Staging demo Fern",
       "visual": true,
       "impact": ["public/index.html", "server.js", "styles/tailwind-input.css"]
+    },
+    {
+      "id": "plants.watered-weekday",
+      "name": "Last watered weekday line",
+      "path": "/?demo=1",
+      "expectText": "· Watered"
+    },
+    {
+      "id": "plants.delete-button",
+      "name": "Per-plant Delete button",
+      "path": "/?demo=1",
+      "expectText": "Delete"
     }
   ]
 }
