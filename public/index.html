@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <script>
   // usernode-dev-console@1
   (function () {
@@ -27,7 +27,7 @@
             seen.add(val);
           }
           if (typeof val === 'function') return '[Function ' + (val.name || 'anonymous') + ']';
-          if (val instanceof Error) return val.stack || (val.name + ': ' + val.message);
+          if (val instanceof Error) return (val.stack || (val.name + ': ' + val.message));
           return val;
         });
       } catch (e) { try { return String(v); } catch (_) { return '[unserializable]'; } }
@@ -64,7 +64,7 @@
   })();
   </script>
   <title>Plant Pal</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%237c3aed'/><circle cx='50' cy='50' r='18' fill='white'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 6C27 34 14 54 14 70a36 36 0 0 0 72 0C86 54 73 34 50 6Z' fill='%2315803d'/></svg>">
   <!-- Tailwind, PRECOMPILED for this app (was cdn.tailwindcss.com's
        in-browser engine plus an inline tailwind.config here). The config
        moved to tailwind.config.js in the repo root; npm run build compiles
@@ -108,156 +108,259 @@
   </script>
 </head>
 <body class="min-h-screen bg-ground text-fg">
-  <!-- Built from the design kit in styles/tailwind-input.css: colour tokens
-       (bg-ground, text-muted, bg-accent, ...) that are right in both looks,
-       and components (btn-primary, list, card, state-empty, ...). The real
-       app keeps the kit; CLAUDE.md's "## Design" says how. -->
   <main class="mx-auto flex max-w-md flex-col gap-8 px-4 py-10">
 
-    <!-- usernode-starter-notice@1 — starter-template messaging. When building
-         the user's real app, replace this whole screen and delete this block,
-         both sentinel comments included. -->
-    <section class="card flex flex-col items-start gap-3">
-      <span class="rounded-full bg-raised px-3 py-1 text-small font-medium text-muted">Starter template</span>
+    <header class="px-1">
       <h1 class="text-title">Plant Pal</h1>
-      <p class="text-body text-muted">Welcome to your new app! Everything on this screen is placeholder content that came with it.</p>
-      <p class="text-body text-muted">Tap the <strong class="font-semibold text-fg">Homeroom icon</strong> in the header and choose <strong class="font-semibold text-fg">Start a new change</strong> to start building your app. Describe what you'd like in plain English, and it will be turned into your real app.</p>
-    </section>
+      <p id="today-count" class="text-small text-muted"></p>
+    </header>
 
-    <section>
-      <h2 class="section-label">What's already working</h2>
-      <ul class="list">
-        <li class="list-row items-start">
-          <svg class="mt-0.5 h-5 w-5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0l-3-3a1 1 0 1 1 1.4-1.4L9 11.6l6.3-6.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
-          <div>
-            <p class="text-body font-medium">Sign-in</p>
-            <p class="text-small text-muted">You're signed in through Homeroom automatically, with no accounts to build.</p>
-          </div>
-        </li>
-        <li class="list-row items-start">
-          <svg class="mt-0.5 h-5 w-5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0l-3-3a1 1 0 1 1 1.4-1.4L9 11.6l6.3-6.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
-          <div>
-            <p class="text-body font-medium">Database</p>
-            <p class="text-small text-muted">Your app has its own private database, ready to store things.</p>
-          </div>
-        </li>
-        <li class="list-row items-start">
-          <svg class="mt-0.5 h-5 w-5 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0l-3-3a1 1 0 1 1 1.4-1.4L9 11.6l6.3-6.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
-          <div>
-            <p class="text-body font-medium">Live API</p>
-            <p class="text-small text-muted">The example below talks to a real server. Try it.</p>
-          </div>
-        </li>
-      </ul>
-    </section>
-    <!-- /usernode-starter-notice@1 -->
-
-    <section class="flex flex-col items-center gap-5">
-      <div class="w-full px-1">
-        <h2 class="text-heading">Try the example</h2>
-        <p class="text-small text-muted">This example will be replaced</p>
+    <!-- Anything that loads data shows exactly one of these at a time:
+         loading, the data (the two lists below), empty or error. -->
+    <div id="plants-loading" role="status">
+      <span class="sr-only">Loading your plants</span>
+      <div class="list">
+        <div class="list-row"><div class="skeleton h-4 w-2/5"></div></div>
+        <div class="list-row"><div class="skeleton h-4 w-1/2"></div></div>
+        <div class="list-row"><div class="skeleton h-4 w-1/3"></div></div>
       </div>
+    </div>
 
-      <button id="press-btn" class="btn-primary h-32 w-32 rounded-full text-title active:scale-95">Press!</button>
+    <div id="plants-error" class="state-error" hidden>
+      <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p class="text-heading">Couldn't load your plants</p>
+      <p class="text-body text-muted">Your plants are saved and untouched — the list just failed to load.</p>
+      <button id="plants-retry" class="btn-secondary">Retry</button>
+    </div>
 
-      <p id="count" class="min-h-6 text-body text-muted"></p>
+    <div id="plants-empty" class="state-empty" hidden>
+      <p class="text-heading">No plants yet</p>
+      <p class="text-body text-muted">Add your first plant to start tracking when it needs water.</p>
+      <button id="empty-add" class="btn-secondary">Add a plant</button>
+    </div>
 
-      <div class="w-full">
-        <h3 class="section-label">Leaderboard</h3>
-        <!-- Anything that loads data shows exactly one of these at a time:
-             loading, the data, empty (it loaded, and there is nothing yet)
-             or error (it did not load). The script below switches them. -->
-        <div id="leaderboard-loading" role="status">
-          <span class="sr-only">Loading the leaderboard</span>
-          <div class="list">
-            <div class="list-row"><div class="skeleton h-4 w-1/2"></div></div>
-            <div class="list-row"><div class="skeleton h-4 w-1/3"></div></div>
-            <div class="list-row"><div class="skeleton h-4 w-2/5"></div></div>
-          </div>
-        </div>
-        <ol id="leaderboard" class="list" hidden></ol>
-        <div id="leaderboard-empty" class="state-empty" hidden>
-          <p class="text-heading">No presses yet</p>
-          <p class="text-body text-muted">Press the button to put your name on the board.</p>
-          <button id="leaderboard-press" class="btn-secondary">Press it</button>
-        </div>
-        <div id="leaderboard-error" class="state-error" hidden>
-          <svg class="h-6 w-6 text-danger" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
-          <p class="text-heading">Couldn't load the leaderboard</p>
-          <p class="text-body text-muted">Pressing still works, and every press is saved.</p>
-          <button id="leaderboard-retry" class="btn-secondary">Retry</button>
-        </div>
-      </div>
+    <section id="today-section" hidden>
+      <h2 class="section-label">Needs water today</h2>
+      <ul id="today-list" class="list"></ul>
+      <p id="water-error" class="mt-2 px-1 text-small text-danger" hidden></p>
     </section>
 
-    <p class="text-center text-small text-muted">Built on Homeroom. This template screen disappears once you build your real app.</p>
+    <section id="all-section" hidden>
+      <h2 class="section-label">All plants</h2>
+      <ul id="all-list" class="list"></ul>
+    </section>
+
+    <section class="card">
+      <h2 class="section-label">Add plant</h2>
+      <form id="add-form" class="flex flex-col gap-3">
+        <div>
+          <label for="plant-name" class="mb-1 block text-small font-medium">Plant name</label>
+          <input id="plant-name" class="field" type="text" maxlength="255" required autocomplete="off" placeholder="e.g. Monstera">
+        </div>
+        <div>
+          <label for="plant-interval" class="mb-1 block text-small font-medium">Watering interval</label>
+          <input id="plant-interval" class="field" type="number" min="1" max="365" step="1" value="7" inputmode="numeric">
+          <p class="mt-1 text-small text-muted">Days between waterings</p>
+        </div>
+        <button type="submit" id="add-btn" class="btn-primary">Add plant</button>
+        <p id="add-error" class="text-small text-danger" hidden></p>
+      </form>
+    </section>
+
   </main>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token') || '';
-    const headers = token ? { 'x-usernode-token': token } : {};
-    const count = document.getElementById('count');
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token') || '';
+      // Forward the staging demo flag to the API (read-only fake plants;
+      // see server.js). It only ever matters in staging.
+      const apiQuery = params.get('demo') === '1' ? '?demo=1' : '';
+      const apiHeaders = token ? { 'x-usernode-token': token } : {};
 
-    // The leaderboard's states, one shown at a time. Empty only when the
-    // load worked and found nothing; a failure is the error state, never
-    // "No presses yet".
-    const views = {
-      loading: document.getElementById('leaderboard-loading'),
-      list: document.getElementById('leaderboard'),
-      empty: document.getElementById('leaderboard-empty'),
-      error: document.getElementById('leaderboard-error'),
-    };
-    function show(state) {
-      for (const [name, el] of Object.entries(views)) el.hidden = name !== state;
-    }
+      const el = {
+        count: document.getElementById('today-count'),
+        loading: document.getElementById('plants-loading'),
+        error: document.getElementById('plants-error'),
+        empty: document.getElementById('plants-empty'),
+        todaySection: document.getElementById('today-section'),
+        todayList: document.getElementById('today-list'),
+        allSection: document.getElementById('all-section'),
+        allList: document.getElementById('all-list'),
+        waterError: document.getElementById('water-error'),
+        retry: document.getElementById('plants-retry'),
+        emptyAdd: document.getElementById('empty-add'),
+        addForm: document.getElementById('add-form'),
+        addName: document.getElementById('plant-name'),
+        addInterval: document.getElementById('plant-interval'),
+        addBtn: document.getElementById('add-btn'),
+        addError: document.getElementById('add-error'),
+      };
 
-    async function loadLeaderboard() {
-      let leaderboard;
-      try {
-        const res = await fetch('/api/leaderboard', { headers });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        ({ leaderboard } = await res.json());
-      } catch {
-        show('error');
-        return;
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      let plants = [];
+
+      function daysSince(iso, now) {
+        return Math.floor((now - new Date(iso).getTime()) / DAY_MS);
       }
-      // People's names go in as text, never as HTML.
-      views.list.replaceChildren(...leaderboard.map((r, i) => {
-        const row = document.createElement('li');
-        row.className = 'list-row justify-between';
-        const name = document.createElement('span');
-        name.textContent = (i + 1) + '. ' + r.username;
-        const presses = document.createElement('span');
-        presses.className = 'tabular-nums text-muted';
-        presses.textContent = r.presses;
-        row.append(name, presses);
-        return row;
-      }));
-      const total = leaderboard.reduce((s, r) => s + parseInt(r.presses, 10), 0);
-      count.textContent = total + (total === 1 ? ' press so far' : ' presses so far');
-      show(leaderboard.length ? 'list' : 'empty');
-    }
 
-    async function press() {
-      try {
-        const res = await fetch('/api/press', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
+      // One place computes a plant's watering state, from the viewer's local
+      // clock: watered less than 24 hours ago is "Watered recently", never
+      // watered or at/past the interval is due today.
+      function status(plant, now) {
+        if (!plant.lastWateredAt) return { due: true, label: 'Due today' };
+        const days = daysSince(plant.lastWateredAt, now);
+        if (days <= 0) return { due: false, label: 'Watered recently' };
+        if (days >= plant.wateringIntervalDays) return { due: true, label: 'Due today' };
+        return { due: false, label: 'Due in ' + (plant.wateringIntervalDays - days) + ' days' };
+      }
+
+      function lastWateredLine(plant, now) {
+        if (!plant.lastWateredAt) return 'Never watered';
+        const days = Math.max(0, daysSince(plant.lastWateredAt, now));
+        if (days === 0) return 'Watered today';
+        if (days === 1) return 'Watered yesterday';
+        return 'Last watered ' + days + ' days ago';
+      }
+
+      // The water drop, this app's signature: accent-coloured when the plant
+      // is due, muted when it is not. Both class strings are whole literals,
+      // so the precompiled stylesheet carries both looks.
+      function dropSvg(due) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 20 20');
+        svg.setAttribute('fill', 'currentColor');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('class', due
+          ? 'mt-0.5 h-5 w-5 shrink-0 text-accent'
+          : 'mt-0.5 h-5 w-5 shrink-0 text-muted');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M10 1.5c-3.3 3.9-5.75 7.1-5.75 10.3a5.75 5.75 0 0 0 11.5 0C15.75 8.6 13.3 5.4 10 1.5Z');
+        svg.appendChild(path);
+        return svg;
+      }
+
+      function nameBlock(plant, subLine) {
+        const wrap = document.createElement('div');
+        wrap.className = 'min-w-0 flex-1';
+        const name = document.createElement('p');
+        name.className = 'truncate text-body font-medium';
+        name.textContent = plant.name;
+        const sub = document.createElement('p');
+        sub.className = 'text-small text-muted';
+        sub.textContent = subLine;
+        wrap.append(name, sub);
+        return wrap;
+      }
+
+      function todayRow(plant, now) {
+        const li = document.createElement('li');
+        li.className = 'list-row';
+        const button = document.createElement('button');
+        button.className = 'btn-primary shrink-0 px-3 text-small';
+        button.textContent = 'Mark watered';
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          el.waterError.hidden = true;
+          try {
+            const res = await fetch('/api/plants/' + plant.id + '/water', {
+              method: 'POST',
+              headers: apiHeaders,
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            await loadPlants();
+          } catch {
+            button.disabled = false;
+            el.waterError.textContent = 'Could not mark ' + plant.name + ' watered. Your plants are unchanged — try again.';
+            el.waterError.hidden = false;
+          }
         });
-        if (res.ok) loadLeaderboard();
-        else if (res.status === 401) count.textContent = 'Sign in to press!';
-      } catch {}
-    }
+        li.append(dropSvg(true), nameBlock(plant, lastWateredLine(plant, now)), button);
+        return li;
+      }
 
-    document.getElementById('press-btn').addEventListener('click', press);
-    document.getElementById('leaderboard-press').addEventListener('click', press);
-    document.getElementById('leaderboard-retry').addEventListener('click', () => {
-      show('loading');
-      loadLeaderboard();
-    });
+      function allRow(plant, now) {
+        const li = document.createElement('li');
+        li.className = 'list-row';
+        const s = status(plant, now);
+        li.append(dropSvg(s.due), nameBlock(plant, s.label));
+        return li;
+      }
 
-    loadLeaderboard();
+      function render() {
+        const now = Date.now();
+        el.todayList.replaceChildren(...plants.filter(p => status(p, now).due).map(p => todayRow(p, now)));
+        el.allList.replaceChildren(...plants.map(p => allRow(p, now)));
+        const dueCount = el.todayList.children.length;
+        el.count.textContent =
+          plants.length === 0 ? '' :
+          dueCount === 0 ? 'All watered today' :
+          dueCount === 1 ? '1 plant needs water today' :
+          dueCount + ' plants need water today';
+        setPane(plants.length ? 'data' : 'empty');
+      }
+
+      // Exactly one pane (loading, data, empty, error) visible at a time;
+      // within the data pane the "today" section disappears when the group
+      // is empty rather than showing an empty list.
+      function setPane(name) {
+        el.loading.hidden = name !== 'loading';
+        el.error.hidden = name !== 'error';
+        el.empty.hidden = name !== 'empty';
+        const data = name === 'data';
+        el.todaySection.hidden = !data || el.todayList.children.length === 0;
+        el.allSection.hidden = !data;
+      }
+
+      async function loadPlants(opts = {}) {
+        if (opts.showLoading) setPane('loading');
+        let data;
+        try {
+          const res = await fetch('/api/plants' + apiQuery, { headers: apiHeaders });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          data = await res.json();
+        } catch {
+          setPane('error');
+          return;
+        }
+        plants = Array.isArray(data.plants) ? data.plants : [];
+        render();
+      }
+
+      el.retry.addEventListener('click', () => loadPlants({ showLoading: true }));
+
+      el.emptyAdd.addEventListener('click', () => {
+        el.addForm.scrollIntoView({ block: 'center' });
+        el.addName.focus();
+      });
+
+      el.addForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        el.addError.hidden = true;
+        const name = el.addName.value.trim();
+        if (!name) return;
+        const interval = el.addInterval.value === '' ? 7 : Number(el.addInterval.value);
+        el.addBtn.disabled = true;
+        try {
+          const res = await fetch('/api/plants', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...apiHeaders },
+            body: JSON.stringify({ name, wateringIntervalDays: interval }),
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          el.addName.value = '';
+          el.addInterval.value = '7';
+          await loadPlants();
+        } catch {
+          el.addError.textContent = 'Could not add the plant. Nothing was saved — try again.';
+          el.addError.hidden = false;
+        } finally {
+          el.addBtn.disabled = false;
+        }
+      });
+
+      loadPlants({ showLoading: true });
+    })();
   </script>
 </body>
 </html>

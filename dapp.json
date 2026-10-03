@@ -1,4 +1,29 @@
 {
   "description": "Track watering schedules and care reminders for your houseplants",
-  "secrets": []
+  "secrets": [],
+  "tests": [
+    {
+      "id": "plants.today-screen",
+      "name": "Plant Pal screen renders",
+      "path": "/",
+      "expectText": "Plant Pal",
+      "visual": true,
+      "impact": ["public/**", "server.js"]
+    },
+    {
+      "name": "New viewer sees the empty state, not demo rows",
+      "path": "/",
+      "expectText": "No plants yet"
+    },
+    {
+      "name": "Add plant form is present",
+      "path": "/",
+      "expectText": "Watering interval"
+    },
+    {
+      "name": "Demo plants render with ?demo=1 (staging)",
+      "path": "/?demo=1",
+      "expectText": "Staging demo fern"
+    }
+  ]
 }

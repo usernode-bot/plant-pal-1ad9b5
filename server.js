@@ -7,6 +7,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+// Data and irreversible side effects are gated on staging, never features.
+const IS_STAGING = process.env.USERNODE_ENV === 'staging';
+
 // The platform signs user-identity tokens with an RSA private key it never
 // shares. Containers get only the PUBLIC half, so this app can verify who a
 // user is but cannot mint an identity — and neither can any other app.
@@ -109,29 +112,83 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // fresh load.
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
-// Button press
-app.post('/api/press', async (req, res) => {
+// Plants: the signed-in viewer's watering list. Rows are per-user — every
+// query filters on `user_id`, so no viewer sees or changes another's plants.
+const PLANT_COLUMNS = 'id, name, watering_interval_days, last_watered_at, created_at';
+
+const plantFromRow = (row) => ({
+  id: row.id,
+  name: row.name,
+  wateringIntervalDays: row.watering_interval_days,
+  lastWateredAt: row.last_watered_at,
+  createdAt: row.created_at,
+});
+
+// Read-only demo state for staging previews (`?demo=1`): four obviously fake
+// plants in all four watering states, so the populated screen can be seen in
+// a preview without a real plant row. Never persisted, never in production.
+const DAY_MS = 86_400_000;
+const demoPlants = () => {
+  const now = Date.now();
+  const daysAgo = (days) => new Date(now - days * DAY_MS).toISOString();
+  return [
+    { id: 900001, name: 'Staging demo fern', wateringIntervalDays: 7, lastWateredAt: null, createdAt: daysAgo(30) },
+    { id: 900002, name: 'Staging demo monstera', wateringIntervalDays: 7, lastWateredAt: daysAgo(9), createdAt: daysAgo(29) },
+    { id: 900003, name: 'Staging demo pothos', wateringIntervalDays: 7, lastWateredAt: daysAgo(4), createdAt: daysAgo(28) },
+    { id: 900004, name: 'Staging demo basil', wateringIntervalDays: 7, lastWateredAt: daysAgo(0), createdAt: daysAgo(27) },
+  ];
+};
+
+app.get('/api/plants', async (req, res) => {
+  if (IS_STAGING && req.query.demo === '1') {
+    return res.json({ plants: demoPlants() });
+  }
   try {
-    await pool.query(`
-      INSERT INTO presses (user_id, username) VALUES ($1, $2)
-    `, [req.user.id, req.user.username]);
-    res.json({ ok: true });
+    const { rows } = await pool.query(`
+      SELECT ${PLANT_COLUMNS} FROM plants WHERE user_id = $1 ORDER BY created_at, id
+    `, [req.user.id]);
+    res.json({ plants: rows.map(plantFromRow) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Leaderboard
-app.get('/api/leaderboard', async (_req, res) => {
+app.post('/api/plants', async (req, res) => {
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+  if (!name || name.length > 255) {
+    return res.status(400).json({ error: 'Give the plant a name of up to 255 characters.' });
+  }
+  let interval = req.body.wateringIntervalDays;
+  if (interval === undefined || interval === null || interval === '') interval = 7;
+  interval = Number(interval);
+  if (!Number.isInteger(interval) || interval < 1 || interval > 365) {
+    return res.status(400).json({ error: 'Watering interval must be a whole number of days between 1 and 365.' });
+  }
   try {
     const { rows } = await pool.query(`
-      SELECT username, COUNT(*) as presses
-      FROM presses
-      GROUP BY username
-      ORDER BY presses DESC
-      LIMIT 50
-    `);
-    res.json({ leaderboard: rows });
+      INSERT INTO plants (user_id, name, watering_interval_days)
+      VALUES ($1, $2, $3)
+      RETURNING ${PLANT_COLUMNS}
+    `, [req.user.id, name, interval]);
+    res.status(201).json({ plant: plantFromRow(rows[0]) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/plants/:id/water', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(404).json({ error: 'Plant not found' });
+  try {
+    // The user_id predicate means one viewer cannot water another's plant;
+    // 404 rather than 403 so it does not reveal that the plant exists.
+    const { rows } = await pool.query(`
+      UPDATE plants SET last_watered_at = NOW()
+      WHERE id = $1 AND user_id = $2
+      RETURNING ${PLANT_COLUMNS}
+    `, [id, req.user.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Plant not found' });
+    res.json({ plant: plantFromRow(rows[0]) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -174,15 +231,40 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Fake owner for the staging demo rows: negative, so it can never collide
+// with a real user id from a platform-issued token.
+const STAGING_DEMO_USER_ID = -1;
+
 async function start() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS presses (
+    CREATE TABLE IF NOT EXISTS plants (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL,
-      username VARCHAR(255) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      watering_interval_days INTEGER NOT NULL DEFAULT 7,
+      last_watered_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  if (IS_STAGING) {
+    // Obviously fake demo plants owned by a fake identity, spread across all
+    // four watering states (never watered, overdue, due soon, just watered).
+    // Idempotent: skipped once the demo owner has any row.
+    const existing = await pool.query(
+      'SELECT 1 FROM plants WHERE user_id = $1 LIMIT 1',
+      [STAGING_DEMO_USER_ID],
+    );
+    if (existing.rowCount === 0) {
+      await pool.query(`
+        INSERT INTO plants (user_id, name, watering_interval_days, last_watered_at)
+        VALUES
+          ($1, 'Staging demo fern', 7, NULL),
+          ($1, 'Staging demo monstera', 7, NOW() - INTERVAL '9 days'),
+          ($1, 'Staging demo pothos', 7, NOW() - INTERVAL '4 days'),
+          ($1, 'Staging demo basil', 7, NOW())
+      `, [STAGING_DEMO_USER_ID]);
+    }
+  }
   const server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;

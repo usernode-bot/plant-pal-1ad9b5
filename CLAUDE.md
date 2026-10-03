@@ -58,35 +58,17 @@ this check for you and tells you when you are behind. It is silent offline, so
 its silence is not proof the checkout is current. Inside Homeroom's dev-chat
 the platform fixes the base commit, and none of this applies.
 
-## Starter template
+## Starter template (replaced)
 
-The screen this app currently ships — the hero, the "What's already
-working" card, and the Press! example (the demo markup in
-`public/index.html`, the `/api/press` and `/api/leaderboard` routes, and
-the `presses` table bootstrap in `server.js`) — is placeholder content
-from the Homeroom starter template, not product intent.
-
-When the user asks for their first real feature, REPLACE the template
-screen rather than building alongside it:
-
-- remove the `usernode-starter-notice@1` block in `public/index.html`
-  (both sentinel comments and everything between them),
-- remove or repurpose the "Try the example" card, its demo endpoints and
-  the `presses` table as appropriate,
-- rewrite `README.md` to describe the actual app.
-
-Keep the `usernode-dev-console@1` forwarder `<script>` when rewriting the
-HTML — that block is platform infrastructure, not template content. So is
-the bridge `<script>`. The design kit is not placeholder either: build the
-real app with it, and fill in "## Design" below.
-
-The screen has a light and a dark look and follows the viewer's Homeroom
-theme, switching live when they change it: the theme `<script>` right after
-the bridge tag sets a `dark` class on `<html>`. Keep that script, and give
-everything you build both looks (the design kit's colour tokens carry both), unless one
-fixed look is the point of this app, like a game's own scene; then say so
-under "## Design" below. Unless a request asks for one, add
-no theme picker: the viewer's Homeroom setting is the control. "The
+The starter template screen (the Press! demo, `/api/press`, `/api/leaderboard`
+and the `presses` table) was replaced by the app's first real screen. The
+platform infrastructure that must survive any future rewrite of
+`public/index.html` is still there: the `usernode-dev-console@1` forwarder
+`<script>`, the `/tailwind.css` link, the bridge `<script>`, and the theme
+`<script>` right after the bridge tag, which sets a `dark` class on `<html>`
+from the viewer's Homeroom theme. Give everything you build both looks (the
+design kit's colour tokens carry both); unless a request asks for one, add
+no theme picker — the viewer's Homeroom setting is the control. "The
 platform's light/dark theme inside the app frame" in the platform
 conventions has the details.
 
@@ -100,24 +82,30 @@ tables you've marked private), etc.
 
 ## About Plant Pal
 
-Track watering schedules and care reminders for your houseplants
-
-_(add a sentence or two more of product context here so Claude Code has a
-shared understanding of what this app is for)_
+Track watering schedules for your houseplants. The user keeps a list of
+their plants with a per-plant watering interval in days, sees when each was
+last watered, and waters the ones that are due today from a single screen.
+The one primary action is **Mark watered**. First version: add, list and
+water — no editing, deleting, reminders or photos yet.
 
 ## Design
 
-This app's look. The first real version fills in the blanks; every later
-change follows it, and updates it when a request changes the look on purpose.
+This app's look. Every later change follows it, and updates it when a
+request changes the look on purpose.
 
-- **Palette:** _(name the accent, any second colour and the neutrals, e.g.
-  "accent: tomato red; second: basil green; neutrals: warm greys")_
-- **Signature element:** _(the one thing on screen drawn from this app's
-  subject, which no other app would have)_
+- **Palette:** basil green accent on the warm stone neutrals the starter
+  kit ships (ground, surface, raised, fg, muted, line untouched). Light
+  accent `21 128 61` (deep basil, white text on it), dark accent
+  `134 239 172` (bright leaf) with dark text `20 83 45`. No second colour;
+  danger untouched.
+- **Signature element:** the water-drop glyph on every plant row — drawn in
+  the accent when the plant is due, muted when it is not, so the state
+  reads before the words do.
 - **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`
-  _(change their sizes in `tailwind.config.js` if you must, not their number)_
-- **One fixed look:** _(only for an app drawn as its own scene, such as a
-  game: which look, and why. Otherwise delete this line.)_
+  (unchanged sizes in `tailwind.config.js`).
+- The screen is a normal app screen, not a scene: it renders in both the
+  light and the dark look from the same tokens; no fixed theme, no theme
+  picker.
 
 The kit is in `styles/tailwind-input.css`: colour tokens with a light and
 a dark value (named in `tailwind.config.js`), and a few components
@@ -139,6 +127,13 @@ Re-theme by changing the token values there, keeping every text pair at
 
 ## App-specific conventions
 
-_(optional — e.g. "all currency values stored as integer cents, not
-floats"; "the `posts` table is append-only"; "avoid adding new
-dependencies"; etc.)_
+- Plant rows are strictly per-user: every query on `plants` filters on
+  `user_id = req.user.id`; one viewer can never read or water another's
+  plant (a foreign id answers 404, not 403).
+- Watering state is computed client-side from `lastWateredAt` and
+  `wateringIntervalDays` against the viewer's local day; the server stores
+  only the timestamp.
+- The `plants` table stays public (no `staging:private` comment): it holds
+  plant names and watering dates, nothing sensitive beyond that.
+- Staging demo rows are owned by fake identity `user_id = -1`; previews
+  see a populated screen via `/?demo=1` (read-only injection, staging only).

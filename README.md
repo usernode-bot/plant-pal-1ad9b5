@@ -1,28 +1,29 @@
 # Plant Pal
 
-> **Starter template** — this repo was scaffolded by Homeroom Social
-> Vibecoding. Everything in it is placeholder example code until the
-> app's first real feature is built.
+Track watering schedules for your houseplants: list your plants, see when
+each one was last watered, and see which ones need water today. One screen,
+one action that matters — **Mark watered**.
 
-The scaffold is a small working demo that proves the plumbing works:
+- **Needs water today** — every plant whose watering day has arrived, with a
+  **Mark watered** button right on the row.
+- **All plants** — your whole list, each plant with a water-drop status
+  (Due today, Due in N days, Watered recently).
+- **Add plant** — a name and a watering interval in days (default 7).
 
-- **Sign-in** — the server verifies the platform-issued user token
-  (an RS256 JWT) on every request, so the app already knows who is
-  using it. No accounts to build.
-- **Database** — the app has its own private Postgres database; the
-  demo stores button presses in a `presses` table.
-- **Live API** — two example routes (`/api/press`,
-  `/api/leaderboard`) read and write through a real Express server.
-- **Styling** — Tailwind CSS, precompiled by `npm run build` during
-  image creation with either Kubernetes/Paketo or standalone Docker, in a
-  light and a dark look that follow the viewer's Homeroom theme.
+Your plants belong to you: you see and change only your own list.
 
-## Replacing the template
+## How it works
 
-Open the app on Homeroom, tap the Homeroom icon in the header, choose
-**Start a new change**, and describe the app you want in plain English.
-The template will be replaced with your real app. You can also run
-Claude Code against this repo directly; start with `CLAUDE.md`, which
-carries the app-specific notes and points at the platform rules.
+- **Sign-in** — the server verifies the platform-issued user token (an
+  RS256 JWT) on every API request, so the app already knows who is using
+  it. No accounts to build.
+- **Database** — the app's own private Postgres database; plants live in a
+  `plants` table, one row per plant.
+- **API** — `GET /api/plants`, `POST /api/plants`, `POST /api/plants/:id/water`.
+- **Styling** — Tailwind CSS, precompiled by `npm run build` during image
+  creation, in a light and a dark look that follow the viewer's Homeroom
+  theme.
 
-Once the real app exists, rewrite this README to describe it.
+In staging previews, `/?demo=1` shows four fake "Staging demo …" plants so
+the populated screen can be seen; the plain screen shows your real (or
+empty) list.
