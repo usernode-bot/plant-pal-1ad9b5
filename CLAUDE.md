@@ -58,37 +58,32 @@ this check for you and tells you when you are behind. It is silent offline, so
 its silence is not proof the checkout is current. Inside Homeroom's dev-chat
 the platform fixes the base commit, and none of this applies.
 
-## Starter template
+## Starter template (replaced)
 
-The screen this app currently ships — the hero, the "What's already
-working" card, and the Press! example (the demo markup in
-`public/index.html`, the `/api/press` and `/api/leaderboard` routes, and
-the `presses` table bootstrap in `server.js`) — is placeholder content
-from the Homeroom starter template, not product intent.
+The starter template's screen — the starter notice, the "What's already
+working" card and the Press! example (its demo markup, its `/api/press`
+and `/api/leaderboard` routes, and the `presses` table bootstrap) — was
+removed when the app's first real feature was built. Do not build it back.
 
-When the user asks for their first real feature, REPLACE the template
-screen rather than building alongside it:
+What stays from the template, through any rewrite, because it is
+platform infrastructure rather than template content:
 
-- remove the `usernode-starter-notice@1` block in `public/index.html`
-  (both sentinel comments and everything between them),
-- remove or repurpose the "Try the example" card, its demo endpoints and
-  the `presses` table as appropriate,
-- rewrite `README.md` to describe the actual app.
+- the `usernode-dev-console@1` forwarder `<script>`,
+- the bridge `<script>`,
+- the theme `<script>` right after the bridge tag, which sets a `dark`
+  class on `<html>`, and
+- the precompiled `/tailwind.css` link.
 
-Keep the `usernode-dev-console@1` forwarder `<script>` when rewriting the
-HTML — that block is platform infrastructure, not template content. So is
-the bridge `<script>`. The design kit is not placeholder either: build the
-real app with it, and fill in "## Design" below.
+The design kit is not placeholder either: build the real app with it, and
+keep "## Design" below current.
 
-The screen has a light and a dark look and follows the viewer's Homeroom
-theme, switching live when they change it: the theme `<script>` right after
-the bridge tag sets a `dark` class on `<html>`. Keep that script, and give
-everything you build both looks (the design kit's colour tokens carry both), unless one
-fixed look is the point of this app, like a game's own scene; then say so
-under "## Design" below. Unless a request asks for one, add
-no theme picker: the viewer's Homeroom setting is the control. "The
-platform's light/dark theme inside the app frame" in the platform
-conventions has the details.
+The screen keeps a light and a dark look that follow the viewer's Homeroom
+theme, switching live when they change it. Give everything you build both
+looks (the design kit's colour tokens carry both), unless one fixed look is
+the point of this app, like a game's own scene; then say so under "## Design"
+below. Unless a request asks for one, add no theme picker: the viewer's
+Homeroom setting is the control. "The platform's light/dark theme inside the
+app frame" in the platform conventions has the details.
 
 If a rule below this line conflicts with the hosted conventions, the
 hosted conventions win. This file is **app-specific** — write down
@@ -100,24 +95,32 @@ tables you've marked private), etc.
 
 ## About Plant Pal
 
-Track watering schedules and care reminders for your houseplants
-
-_(add a sentence or two more of product context here so Claude Code has a
-shared understanding of what this app is for)_
+Track watering schedules for your houseplants. Each plant gets a name and
+its own watering interval in days, and the screen answers "which plants do
+I water today?" at a glance: a "Needs water today" group on top, with a
+"Mark watered" button per plant, and an "All plants" list below. Marking a
+plant watered restarts its schedule from now. This version keeps it small:
+no photos, no species database, no care reminders or notifications, and
+plants can only be added and watered (no rename, edit or delete).
 
 ## Design
 
-This app's look. The first real version fills in the blanks; every later
-change follows it, and updates it when a request changes the look on purpose.
-
-- **Palette:** _(name the accent, any second colour and the neutrals, e.g.
-  "accent: tomato red; second: basil green; neutrals: warm greys")_
-- **Signature element:** _(the one thing on screen drawn from this app's
-  subject, which no other app would have)_
+- **Palette:** accent basil green — light look: deep basil `21 128 61`
+  with white `--on-accent`; dark look: brighter leaf green `74 222 128`
+  with a dark green `--on-accent`. Red stays reserved for errors. The
+  neutrals are the warm stone greys the template shipped (ground,
+  surface, raised, line, muted).
+- **Signature element:** a per-plant water-drop status — a small drop
+  icon beside each plant that reads **Due today** (drop filled, accent
+  colour), **Due in N days** (drop outlined, muted) or **Watered
+  recently** (drop with a check). No other screen element carries the
+  drop shape.
 - **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`
   _(change their sizes in `tailwind.config.js` if you must, not their number)_
-- **One fixed look:** _(only for an app drawn as its own scene, such as a
-  game: which look, and why. Otherwise delete this line.)_
+- **Words the screen uses:** "Plant Pal", "Needs water today", "All
+  plants", "Mark watered", "Due today", "Due in N days", "Watered
+  recently", "Add plant", "Plant name", "Watering interval", "No plants
+  yet". Reuse them for the same things rather than introducing synonyms.
 
 The kit is in `styles/tailwind-input.css`: colour tokens with a light and
 a dark value (named in `tailwind.config.js`), and a few components
@@ -133,12 +136,13 @@ Re-theme by changing the token values there, keeping every text pair at
 - Every screen that loads data has honest loading, empty and error states.
   Never show the empty state while loading or after a failure; an error says
   what failed, what still works, and offers Retry.
-- Seed obviously fake staging demo data so the populated screen can be seen
-  ("Staging mock data" in the platform conventions).
 - No cards in cards, no uppercase eyebrows, no emoji as icons.
 
 ## App-specific conventions
 
-_(optional — e.g. "all currency values stored as integer cents, not
-floats"; "the `posts` table is append-only"; "avoid adding new
-dependencies"; etc.)_
+- Watering due-ness is computed server-side, in `withStatus` in
+  `server.js`, so the rule lives in one place; the client only renders
+  what it returns.
+- Staging demo plants are request-time injection on `GET /api/plants?demo=1`
+  (behind `IS_STAGING`), never written rows.
+- Avoid adding new npm dependencies.

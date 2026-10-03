@@ -109,29 +109,87 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // fresh load.
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
-// Button press
-app.post('/api/press', async (req, res) => {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Staging previews can show a populated screen without touching the
+// database: only when opened with ?demo=1 does the list return obviously
+// fake plants. Request-time injection, no rows are written, and the flag
+// does nothing in production.
+const IS_STAGING = process.env.USERNODE_ENV === 'staging';
+
+// The due-watering rule lives here, in one place, so the client only
+// renders what this returns:
+// - never watered, or at/past the interval → due today;
+// - watered less than one day ago → watered recently;
+// - otherwise → upcoming, due in N days (N at least 1).
+function withStatus(plant) {
+  if (!plant.last_watered_at) return { ...plant, status: 'due-today' };
+  const days = Math.floor((Date.now() - new Date(plant.last_watered_at).getTime()) / DAY_MS);
+  if (days >= plant.water_every_days) return { ...plant, status: 'due-today' };
+  if (days < 1) return { ...plant, status: 'watered-recently' };
+  return { ...plant, status: 'upcoming', due_in_days: plant.water_every_days - days };
+}
+
+// Plant list
+app.get('/api/plants', async (req, res) => {
   try {
-    await pool.query(`
-      INSERT INTO presses (user_id, username) VALUES ($1, $2)
-    `, [req.user.id, req.user.username]);
-    res.json({ ok: true });
+    if (IS_STAGING && req.query.demo === '1') {
+      const now = Date.now();
+      return res.json({ plants: [
+        // 9 days since a 7-day interval → due today; 10 hours ago →
+        // recently; never watered → due today.
+        { id: -1, name: 'Staging demo Fern', water_every_days: 7, last_watered_at: new Date(now - 9 * DAY_MS).toISOString() },
+        { id: -2, name: 'Staging demo Pothos', water_every_days: 7, last_watered_at: new Date(now - 10 * 60 * 60 * 1000).toISOString() },
+        { id: -3, name: 'Staging demo Basil', water_every_days: 7, last_watered_at: null },
+      ].map(withStatus) });
+    }
+    const { rows } = await pool.query(`
+      SELECT id, name, water_every_days, last_watered_at
+      FROM plants
+      WHERE user_id = $1
+      ORDER BY name
+    `, [req.user.id]);
+    res.json({ plants: rows.map(withStatus) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Leaderboard
-app.get('/api/leaderboard', async (_req, res) => {
+// Add a plant
+app.post('/api/plants', async (req, res) => {
+  const name = req.body && typeof req.body.name === 'string' ? req.body.name.trim() : '';
+  const interval = req.body && req.body.water_every_days !== undefined
+    ? req.body.water_every_days
+    : 7;
+  if (!name) return res.status(400).json({ error: 'Give the plant a name' });
+  if (!Number.isInteger(interval) || interval < 1 || interval > 365) {
+    return res.status(400).json({ error: 'Watering interval must be a whole number of days between 1 and 365' });
+  }
   try {
     const { rows } = await pool.query(`
-      SELECT username, COUNT(*) as presses
-      FROM presses
-      GROUP BY username
-      ORDER BY presses DESC
-      LIMIT 50
-    `);
-    res.json({ leaderboard: rows });
+      INSERT INTO plants (user_id, name, water_every_days)
+      VALUES ($1, $2, $3)
+      RETURNING id, name, water_every_days, last_watered_at
+    `, [req.user.id, name, interval]);
+    res.json({ plant: withStatus(rows[0]) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mark watered
+app.post('/api/plants/:id/water', async (req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(404).json({ error: 'Plant not found' });
+  try {
+    const result = await pool.query(`
+      UPDATE plants SET last_watered_at = NOW()
+      WHERE id = $1 AND user_id = $2
+    `, [id, req.user.id]);
+    // Not owned or not found get the same answer, so a stranger cannot
+    // learn which ids exist.
+    if (!result.rowCount) return res.status(404).json({ error: 'Plant not found' });
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -176,11 +234,12 @@ app.get('*', (req, res) => {
 
 async function start() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS presses (
+    CREATE TABLE IF NOT EXISTS plants (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL,
-      username VARCHAR(255) NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      name VARCHAR(255) NOT NULL,
+      water_every_days INTEGER NOT NULL,
+      last_watered_at TIMESTAMPTZ
     )
   `);
   const server = app.listen(port, () => console.log(`Listening on :${port}`));

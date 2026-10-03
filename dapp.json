@@ -1,4 +1,14 @@
 {
   "description": "Track watering schedules and care reminders for your houseplants",
-  "secrets": []
+  "secrets": [],
+  "tests": [
+    {
+      "id": "plants.list",
+      "name": "Plant list",
+      "path": "/?demo=1",
+      "expectText": "Staging demo Fern",
+      "visual": true,
+      "impact": ["public/index.html", "server.js", "styles/tailwind-input.css"]
+    }
+  ]
 }
