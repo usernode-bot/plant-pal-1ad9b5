@@ -7,6 +7,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+// Data and irreversible side effects are gated on staging, never features.
+const IS_STAGING = process.env.USERNODE_ENV === 'staging';
+
 // The platform signs user-identity tokens with an RSA private key it never
 // shares. Containers get only the PUBLIC half, so this app can verify who a
 // user is but cannot mint an identity — and neither can any other app.
@@ -110,12 +113,6 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-// Staging previews can show a populated screen without touching the
-// database: only when opened with ?demo=1 does the list return obviously
-// fake plants. Request-time injection, no rows are written, and the flag
-// does nothing in production.
-const IS_STAGING = process.env.USERNODE_ENV === 'staging';
 
 // The due-watering rule lives here, in one place, so the client only
 // renders what this returns:

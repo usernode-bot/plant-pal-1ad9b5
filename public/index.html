@@ -27,7 +27,7 @@
             seen.add(val);
           }
           if (typeof val === 'function') return '[Function ' + (val.name || 'anonymous') + ']';
-          if (val instanceof Error) return val.stack || (val.name + ': ' + val.message);
+          if (val instanceof Error) return (val.stack || (val.name + ': ' + val.message));
           return val;
         });
       } catch (e) { try { return String(v); } catch (_) { return '[unserializable]'; } }
