@@ -201,15 +201,20 @@
       return { icon: 'outline', label: 'Due in ' + n + (n === 1 ? ' day' : ' days') };
     }
 
+    // Short weekday names for the "Watered Tue" line, in the viewer's
+    // local time.
+    const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
     function lastWateredText(plant) {
       if (!plant.last_watered_at) return 'Never watered';
       const watered = new Date(plant.last_watered_at);
       const now = new Date();
+      // Same calendar day reads "Watered today"; otherwise the weekday of
+      // the day it was watered.
       const sameDay = watered.getFullYear() === now.getFullYear()
         && watered.getMonth() === now.getMonth()
         && watered.getDate() === now.getDate();
-      if (sameDay) return 'Watered today';
-      return 'Watered ' + watered.toLocaleDateString(undefined, { weekday: 'short' });
+      return sameDay ? 'Watered today' : 'Watered ' + WEEKDAYS[watered.getDay()];
     }
 
     function dropEl(icon) {
@@ -229,12 +234,17 @@
       since.className = 'text-small text-muted';
       since.textContent = lastWateredText(plant);
       text.append(name, since);
+      // Watering stays the primary action; Delete is the quieter secondary
+      // one, stacked beneath it.
+      const actions = document.createElement('div');
+      actions.className = 'flex flex-col gap-2';
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'btn-primary';
       button.textContent = 'Mark watered';
       button.addEventListener('click', () => waterPlant(plant, button));
-      li.append(dropEl('filled'), text, button, deleteButton(plant));
+      actions.append(button, deleteButton(plant));
+      li.append(dropEl('filled'), text, actions);
       return li;
     }
 
@@ -254,6 +264,45 @@
       text.append(name, line);
       li.append(dropEl(state.icon), text, deleteButton(plant));
       return li;
+    }
+
+    // Delete with a two-tap confirm: the first tap arms the button for a
+    // few seconds, only a second tap inside that window removes the plant.
+    function deleteButton(plant) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn-secondary';
+      button.textContent = 'Delete';
+      let timer = null;
+      function disarm() {
+        if (timer) clearTimeout(timer);
+        timer = null;
+        button.textContent = 'Delete';
+      }
+      button.addEventListener('click', () => {
+        if (!timer) {
+          button.textContent = 'Confirm delete';
+          timer = setTimeout(disarm, 4000);
+          return;
+        }
+        disarm();
+        deletePlant(plant);
+      });
+      return button;
+    }
+
+    async function deletePlant(plant) {
+      try {
+        const res = await fetch('/api/plants/' + plant.id, { method: 'DELETE', headers });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        // The list reloads without a page refresh: a deleted due-today
+        // plant leaves the today group, deleting the last one shows the
+        // empty state.
+        loadPlants();
+      } catch {
+        // A failed delete (a staging demo plant, a network error) is
+        // silent: the button is back to "Delete" and the plant stays.
+      }
     }
 
     function render(plants) {
