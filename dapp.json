@@ -22,5 +22,9 @@
       "path": "/?demo=1",
       "expectText": "Delete"
     }
-  ]
+  ],
+  "icon": {
+    "image": "brand/icon.png",
+    "emoji": "🪴"
+  }
 }
